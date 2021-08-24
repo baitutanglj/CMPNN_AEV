@@ -57,6 +57,11 @@ def train(model: nn.Module,
         #############my addition############
         atom_descriptors_batch, atom_features_batch, bond_features_batch = \
             mol_batch.atom_descriptors(), mol_batch.atom_features(), mol_batch.bond_features()
+        species_batch = mol_batch.species()
+        if species_batch[0] is not None:
+            species_batch = nn.utils.rnn.pad_sequence(
+            mol_batch.species(), batch_first=True, padding_value=-1
+            )
         ####################################
         batch = smiles_batch
         mask = torch.Tensor([[x is not None for x in tb] for tb in target_batch])
@@ -74,7 +79,8 @@ def train(model: nn.Module,
         model.zero_grad()
         # preds = model(batch, features_batch)
         ##############my addition##################
-        preds = model(batch, features_batch, atom_descriptors_batch, atom_features_batch, bond_features_batch)
+        preds = model(batch, features_batch, atom_descriptors_batch,
+                      atom_features_batch, bond_features_batch, species_batch)
         ###########################################
         if args.dataset_type == 'multiclass':
             targets = targets.long()

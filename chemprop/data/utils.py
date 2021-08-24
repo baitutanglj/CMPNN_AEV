@@ -198,9 +198,11 @@ def get_data(path: str,
 
         atom_features = None
         atom_descriptors = None
+        species = None
         if args is not None and args.atom_descriptors is not None:
             try:
-                descriptors = load_valid_atom_or_bond_features(atom_descriptors_path, [x[0] for x in all_smiles])
+                descriptors, species = load_valid_atom_or_bond_features(atom_descriptors_path, [x[0] for x in all_smiles],
+                                                               split_model=args.split_model)
             except Exception as e:
                 raise ValueError(f'Failed to load or validate custom atomic descriptors or features: {e}')
 
@@ -212,7 +214,8 @@ def get_data(path: str,
         bond_features = None
         if args is not None and args.bond_features_path is not None:
             try:
-                bond_features = load_valid_atom_or_bond_features(bond_features_path, [x[0] for x in all_smiles])
+                bond_features = load_valid_atom_or_bond_features(bond_features_path, [x[0] for x in all_smiles],
+                                                                 split_model=False)
             except Exception as e:
                 raise ValueError(f'Failed to load or validate custom bond features: {e}')
 
@@ -226,6 +229,7 @@ def get_data(path: str,
                 atom_features=atom_features[i] if atom_features is not None else None,
                 atom_descriptors=atom_descriptors[i] if atom_descriptors is not None else None,
                 bond_features=bond_features[i] if bond_features is not None else None,
+                species=species[i] if species is not None else None,
                 overwrite_default_atom_features=args.overwrite_default_atom_features if args is not None else False,
                 overwrite_default_bond_features=args.overwrite_default_bond_features if args is not None else False
             ) for i, (smiles,targets) in tqdm(enumerate(zip(all_smiles,all_targets)), total=len(all_smiles))

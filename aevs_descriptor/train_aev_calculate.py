@@ -1,17 +1,12 @@
 import os
-import shutil
 from pathlib import Path
 import json
-import numpy as np
 import pandas as pd
 import torch
 import torchani
-from typing import List, Optional, Tuple, Union
 from ael import loaders
 import argparsers
 from ael import utils
-import pickle
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -33,7 +28,7 @@ def train_aev_from_loader(args):
         cmap = None
 
     # Distance 0.0 produces a segmentation fault (see MDAnalysis#2656)
-    data: Union[loaders.PDBData, loaders.VSData] = loaders.PDBData(
+    data = loaders.PDBData(
         args.trainfile,
         args.distance,
         args.datapaths,
@@ -73,13 +68,15 @@ def train_aev_from_loader(args):
     utils.saveAEVC(AEVC, n_species, path=os.path.join(result_dir, "aevc.pth"))
 
     aevs = []
+    aevs_species = []
     for maskLIG, species, coordinates in zip(data.maskLIG, data.species, data.coordinates):
         # Move everything to device
         species = torch.unsqueeze(species, 0).to(device)
         coordinates = torch.unsqueeze(coordinates, 0).to(device)
         aev = AEVC.forward((species, coordinates)).aevs
         aevs.append(aev[0,maskLIG].cpu().numpy())
-    df = pd.DataFrame(aevs,index=data.ids)
+        aevs_species.append(species[0,maskLIG].cpu().numpy())
+    df = pd.DataFrame({'features':aevs, 'species':aevs_species},index=data.ids)
     # df.to_pickle('/mnt/home/linjie/projects/aescore/aevs_descriptor/result/aevs.pkl')
     df.to_pickle(args.outpath)
     return aevs

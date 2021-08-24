@@ -8,6 +8,7 @@ import torch
 
 from chemprop.utils import makedirs
 from chemprop.features import get_available_features_generators
+from ael import utils
 
 
 def add_predict_args(parser: ArgumentParser):
@@ -228,6 +229,12 @@ def add_train_args(parser: ArgumentParser):
                         help='Turn off atom feature scaling.')
     parser.add_argument('--bond_features_scaling', action='store_true', default=False,
                         help='Turn off bond feature scaling.')
+    parser.add_argument('--split_model', action='store_true', default=False,
+                        help='Model each atom by category')
+    parser.add_argument('--amap', type=str, default=None, help="Atomic mapping to indices"
+    )
+    parser.add_argument('--ffn_layers', type=int, nargs="+", default=None, help="FFN model layers"
+    )
     #########################
 
 
@@ -371,6 +378,19 @@ def modify_train_args(args: Namespace):
         args.device = torch.device('cuda',args.gpu)
     else:
         torch.device('cpu')
+
+    if args.atom_descriptors_path is None:
+        args.atom_descriptors = None
+
+    if (args.split_model) and (args.amap is not None)\
+           and (args.ffn_layers is not None):
+        raise ValueError('error: argument --amap: expected one argument or --ffn_layers: expected one argument')
+    if args.split_model:
+        amap = utils.load_amap(args.amap)
+        args.n_species = len(amap)
+    else:
+        args.n_species = None
+
     ########################
 
 def parse_train_args() -> Namespace:

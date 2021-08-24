@@ -47,17 +47,17 @@ class MPNEncoder(nn.Module):
         
         for depth in range(self.depth-1):
             self._modules[f'W_h_{depth}'] = nn.Linear(w_h_input_size_bond, self.hidden_size, bias=self.bias)
-        
-        self.W_o = nn.Linear(
-                (self.hidden_size)*2,
-                self.hidden_size)
-        
-        self.gru = BatchGRU(self.hidden_size)
-        
-        self.lr = nn.Linear(self.hidden_size*3, self.hidden_size, bias=self.bias)
-        
 
-    def forward(self,mol_graph: BatchMolGraph, features_batch=None) -> torch.FloatTensor:
+        self.lr = nn.Linear(self.hidden_size*3, self.hidden_size, bias=self.bias)
+
+        self.gru = BatchGRU(self.hidden_size)
+
+        self.W_o = nn.Linear(
+            (self.hidden_size) * 2,
+            self.hidden_size)
+
+
+    def forward(self,mol_graph: BatchMolGraph, split_model:bool=False) -> torch.FloatTensor:
 
         f_atoms, f_bonds, a2b, b2a, b2revb, a_scope, b_scope, bonds = mol_graph.get_components()
         if self.args.cuda or next(self.parameters()).is_cuda:
@@ -100,8 +100,17 @@ class MPNEncoder(nn.Module):
             if a_size == 0:
                 assert 0
             cur_hiddens = atom_hiddens.narrow(0, a_start, a_size)
-            mol_vecs.append(cur_hiddens.mean(0))
-        mol_vecs = torch.stack(mol_vecs, dim=0)
+            if split_model:
+                mol_vecs.append(cur_hiddens)
+            else:
+                mol_vecs.append(cur_hiddens.mean(0))
+
+        if split_model:
+            mol_vecs = nn.utils.rnn.pad_sequence(
+                mol_vecs,batch_first=True,padding_value=-1
+            )
+        else:
+            mol_vecs = torch.stack(mol_vecs, dim=0)
         
         return mol_vecs  # B x H
 
@@ -158,11 +167,12 @@ class MPN(nn.Module):
                  graph_input: bool = False):
         super(MPN, self).__init__()
         self.args = args
-        ##########33###my addition#######
+        ###############my addition#######
         self.use_input_features = args.use_input_features
         self.features_only = args.features_only
         self.device = args.device
         self.overwrite_default_atom_features = args.overwrite_default_atom_features
+        self.split_model = args.split_model
         ##################################
         self.atom_fdim = atom_fdim or get_atom_fdim(args)
         self.bond_fdim = bond_fdim or get_bond_fdim(args) + \
@@ -176,22 +186,30 @@ class MPN(nn.Module):
                 atom_features_batch: List[np.ndarray] = None,
                 bond_features_batch: List[np.ndarray] = None
                 ) -> torch.FloatTensor:
+
+        ###################my addition####################
+        if self.split_model and self.use_input_features:
+            raise ValueError('Currently cannot provide both use split_model and use_input_features in FFN model.')
+        if self.use_input_features:
+            features_batch = torch.from_numpy(np.stack(features_batch)).float().to(self.device)
+            if self.features_only:
+                return features_batch
+
         if not self.graph_input:  # if features only, batch won't even be used
             # batch = mol2graph(batch, self.args)
-            #############my addition#################
             batch = mol2graph(batch, self.args,
                               atom_features_batch,
                               bond_features_batch)
-            #########################################
+        ###################################################
 
-        output = self.encoder.forward(batch, features_batch)
+        # split_model==True-->output:(mol_num,max_atoms_num,feature_size)
+        # split_model==False-->output:(mol_num,feature_size)
+        output = self.encoder.forward(batch, self.split_model)
 
         ##############my addition##############
-        if self.use_input_features:
-            features_batch = torch.from_numpy(np.stack(features_batch)).float().to(self.device)
+        if self.split_model:
+            return output
 
-            if self.features_only:
-                return features_batch
         if self.use_input_features:
             if len(features_batch.shape) == 1:
                 features_batch = features_batch.view(1, -1)

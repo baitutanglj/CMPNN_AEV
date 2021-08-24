@@ -21,6 +21,7 @@ class MoleculeDatapoint:
                  atom_features: np.ndarray = None,
                  atom_descriptors: np.ndarray = None,
                  bond_features: np.ndarray = None,
+                 species:np.ndarray = None,
                  overwrite_default_atom_features: bool = False,
                  overwrite_default_bond_features: bool = False):
         """
@@ -62,6 +63,7 @@ class MoleculeDatapoint:
         self.atom_descriptors = atom_descriptors
         self.atom_features = atom_features
         self.bond_features = bond_features
+        self.species = species
         self.overwrite_default_atom_features = overwrite_default_atom_features
         self.overwrite_default_bond_features = overwrite_default_bond_features
         ####################################################
@@ -161,6 +163,14 @@ class MoleculeDatapoint:
         self.features, self.targets = self.raw_features, self.raw_targets
         self.atom_descriptors, self.atom_features, self.bond_features = \
             self.raw_atom_descriptors, self.raw_atom_features, self.raw_bond_features
+
+    def set_species(self,species:List[Union[str,float]]):
+        """
+        Sets the atoms species of a molecule.
+
+        :param species: A list containing the species message.
+        """
+        self.species = species
     ######################################################
 
 class MoleculeDataset(Dataset):
@@ -241,6 +251,14 @@ class MoleculeDataset(Dataset):
         return len(self.data[0].features) if len(self.data) > 0 and self.data[0].features is not None else None
 
     ################my addition###################
+    def species(self) -> List:
+        """
+        Returns the species associated with the molecules.
+
+        :return: A list of species tensor.
+        """
+        return [d.species for d in self.data]
+
     def atom_features(self) -> List[np.ndarray]:
         """
         Returns the atom descriptors associated with each molecule (if they exit).

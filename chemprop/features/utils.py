@@ -6,6 +6,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from rdkit.Chem import PandasTools
+import torch
 
 
 def save_features(path: str, features: List[np.ndarray]):
@@ -47,14 +48,18 @@ def load_features(path: str) -> np.ndarray:
             next(reader)  # skip header
             features = np.array([[float(value) for value in row] for row in reader])
     elif extension in ['.pkl', '.pckl', '.pickle']:
-        with open(path, 'rb') as f:
-            features = np.array([np.squeeze(np.array(feat.todense())) for feat in pickle.load(f)])
+        # with open(path, 'rb') as f:
+        #     features = np.array([np.squeeze(np.array(feat.todense())) for feat in pickle.load(f)])
+        #############my addition##############
+        features = pd.read_pickle(path)
+        features = np.array(features.apply(lambda x: x.tolist()).tolist())
+        ######################################
     else:
         raise ValueError(f'Features path extension {extension} not supported.')
 
     return features
 
-def load_valid_atom_or_bond_features(path: str, smiles: List[str]) -> List[np.ndarray]:
+def load_valid_atom_or_bond_features(path: str, smiles: List[str], split_model:bool) -> List[np.ndarray]:
     """
     Loads features saved in a variety of formats.
 
@@ -77,9 +82,9 @@ def load_valid_atom_or_bond_features(path: str, smiles: List[str]) -> List[np.nd
     elif extension in ['.pkl', '.pckl', '.pickle']:
         features_df = pd.read_pickle(path)
         if features_df.iloc[0, 0].ndim == 1:
-            features = features_df.apply(lambda x: np.stack(x.tolist(), axis=1), axis=1).tolist()
+            features = pd.DataFrame(features_df['features']).apply(lambda x: np.stack(x.tolist(), axis=1), axis=1).tolist()
         elif features_df.iloc[0, 0].ndim == 2:
-            features = features_df.apply(lambda x: np.concatenate(x.tolist(), axis=1), axis=1).tolist()
+            features = pd.DataFrame(features_df['features']).apply(lambda x: np.concatenate(x.tolist(), axis=1), axis=1).tolist()
         else:
             raise ValueError(f'Atom/bond descriptors input {path} format not supported')
 
@@ -101,4 +106,8 @@ def load_valid_atom_or_bond_features(path: str, smiles: List[str]) -> List[np.nd
     else:
         raise ValueError(f'Extension "{extension}" is not supported.')
 
-    return features
+    if split_model:
+        species = features_df['species'].apply(lambda x: torch.from_numpy(x)).tolist()
+    else:
+        species = None
+    return features, species

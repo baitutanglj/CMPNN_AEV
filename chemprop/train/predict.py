@@ -34,14 +34,19 @@ def predict(model: nn.Module,
         #############my addition############
         atom_descriptors_batch, atom_features_batch, bond_features_batch = \
             mol_batch.atom_descriptors(), mol_batch.atom_features(), mol_batch.bond_features()
+        species_batch = mol_batch.species()
+        if species_batch[0] is not None:
+            species_batch = nn.utils.rnn.pad_sequence(
+                mol_batch.species(), batch_first=True, padding_value=-1
+            )
         ####################################
 
         # Run model
         batch = smiles_batch
 
         with torch.no_grad():
-            batch_preds = model(batch, features_batch, atom_descriptors_batch, atom_features_batch, bond_features_batch)
-
+            batch_preds = model(batch, features_batch, atom_descriptors_batch,
+                                atom_features_batch, bond_features_batch, species_batch)
         batch_preds = batch_preds.data.cpu().numpy()
 
         # Inverse scale if regression
