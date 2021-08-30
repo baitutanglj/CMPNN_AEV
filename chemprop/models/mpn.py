@@ -29,6 +29,9 @@ class MPNEncoder(nn.Module):
         # Dropout
         self.dropout_layer = nn.Dropout(p=self.dropout)
 
+        #Batch Normalization
+        # self.batchNorma_layer = nn.BatchNorm1d(num_features)
+
         # Activation
         self.act_func = get_activation_function(args.activation)
 
@@ -47,7 +50,11 @@ class MPNEncoder(nn.Module):
         
         for depth in range(self.depth-1):
             self._modules[f'W_h_{depth}'] = nn.Linear(w_h_input_size_bond, self.hidden_size, bias=self.bias)
+            # output_size_bond = int(w_h_input_size_bond*0.5)
+            # self._modules[f'W_h_{depth}'] = nn.Linear(w_h_input_size_bond, output_size_bond, bias=self.bias)
+            # w_h_input_size_bond = int(output_size_bond*0.5)
 
+        # self.lr = nn.Linear(self.hidden_size*2+output_size_bond, self.hidden_size, bias=self.bias)
         self.lr = nn.Linear(self.hidden_size*3, self.hidden_size, bias=self.bias)
 
         self.gru = BatchGRU(self.hidden_size)

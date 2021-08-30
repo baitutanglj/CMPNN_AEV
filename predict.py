@@ -29,3 +29,4 @@ if __name__ == '__main__':
     for i in range(len(pred[0])):
         df[task_names[i]] = [item[i] for item in pred]
     df.to_csv(args.preds_path, index=False)
+

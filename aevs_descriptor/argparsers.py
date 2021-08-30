@@ -38,7 +38,7 @@ def trainparser(default="BP"):
     )  # TODO: Change to larger distance
 
     # Radial
-    parser.add_argument("-RcR", type=float, default=4.6, help="Radial cutoff")
+    parser.add_argument("-RcR", type=float, default=5.2, help="Radial cutoff")
     parser.add_argument("-EtaR", type=float, default=16.0, help="Radial decay")
     parser.add_argument(
         "-RsR",
@@ -66,7 +66,7 @@ def trainparser(default="BP"):
     )
 
     # Angular
-    parser.add_argument("-RcA", type=float, default=3.1, help="Angular cutoff")
+    parser.add_argument("-RcA", type=float, default=5.2, help="Angular cutoff")
     parser.add_argument("-EtaA", type=float, default=3.5, help="Angular decay")
     parser.add_argument(
         "-RsA",

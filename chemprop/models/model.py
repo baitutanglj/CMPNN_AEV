@@ -169,6 +169,29 @@ class MoleculeModel(nn.Module):
         activation = get_activation_function(args.activation)
 
         # Create FFN layers
+        # if args.ffn_num_layers == 1:
+        #     ffn = [
+        #         dropout,
+        #         nn.Linear(first_linear_dim, args.output_size)
+        #     ]
+        # else:
+        #     ffn = [
+        #         dropout,
+        #         nn.Linear(first_linear_dim, args.ffn_hidden_size)
+        #     ]
+        #     for _ in range(args.ffn_num_layers - 2):
+        #         ffn.extend([
+        #             activation,
+        #             dropout,
+        #             nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size),
+        #         ])
+        #     ffn.extend([
+        #         activation,
+        #         dropout,
+        #         nn.Linear(args.ffn_hidden_size, args.output_size),
+        #     ])
+
+        # Create FFN layers
         if args.ffn_num_layers == 1:
             ffn = [
                 dropout,
@@ -179,17 +202,27 @@ class MoleculeModel(nn.Module):
                 dropout,
                 nn.Linear(first_linear_dim, args.ffn_hidden_size)
             ]
-            for _ in range(args.ffn_num_layers - 2):
+            layers_input_size = args.ffn_hidden_size
+            layers_output_size = args.ffn_hidden_size
+            for i in range(args.ffn_num_layers - 2):
+                layers_output_size = int(layers_input_size * 0.5)
                 ffn.extend([
                     activation,
                     dropout,
-                    nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size),
+                    nn.Linear(layers_input_size, layers_output_size),
                 ])
+                layers_input_size = layers_output_size
+                # ffn.extend([
+                #     activation,
+                #     dropout,
+                #     nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size),
+                # ])
             ffn.extend([
                 activation,
                 dropout,
-                nn.Linear(args.ffn_hidden_size, args.output_size),
+                nn.Linear(layers_output_size, args.output_size),
             ])
+
 
         # Create FFN model
         ##############my addition##################

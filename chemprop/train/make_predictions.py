@@ -11,6 +11,8 @@ from chemprop.data import MoleculeDataset
 from chemprop.data.utils import get_data, get_data_from_smiles
 from chemprop.utils import load_args, load_checkpoint, load_scalers
 from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim
+from .evaluate import evaluate, evaluate_predictions
+from chemprop.utils import get_metric_func
 
 
 def make_predictions(args: Namespace, smiles: List[str] = None) -> List[Optional[List[float]]]:
@@ -91,7 +93,25 @@ def make_predictions(args: Namespace, smiles: List[str] = None) -> List[Optional
 
     # Ensemble predictions
     avg_preds = sum_preds / len(args.checkpoint_paths)
+    avg_preds = np.round(avg_preds,4)
     avg_preds = avg_preds.tolist()
+
+    #get metric
+    metric_func = get_metric_func(metric=args.metric)
+    info = print
+    ensemble_scores = evaluate_predictions(
+        preds=avg_preds,
+        targets=test_data.targets(),
+        num_tasks=args.num_tasks,
+        metric_func=metric_func,
+        dataset_type=args.dataset_type,
+        logger=None
+    )
+    # Average ensemble score
+    avg_ensemble_test_score = np.nanmean(ensemble_scores)
+    info(f'Ensemble test {args.metric} = {avg_ensemble_test_score:.6f}')
+
+
     return avg_preds, test_data.smiles()
 # =============================================================================
 #     # Save predictions
