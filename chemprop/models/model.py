@@ -8,6 +8,7 @@ from collections import OrderedDict
 from typing import List, Optional
 import torch
 import numpy as np
+from chemprop.features import set_extra_atom_fdim
 
 
 class AtomicNN(nn.Module):
@@ -122,7 +123,11 @@ class FFNModel(nn.ModuleDict):
 class MoleculeModel(nn.Module):
     """A MoleculeModel is a model which contains a message passing network following by feed-forward layers."""
 
-    def __init__(self, classification: bool, multiclass: bool, n_species: int=None):
+    def __init__(self, classification: bool,
+                 multiclass: bool,
+                 n_species: int=None,
+                 another_model:bool=False,
+                 args: Namespace=None):
         """
         Initializes the MoleculeModel.
 
@@ -139,6 +144,8 @@ class MoleculeModel(nn.Module):
         assert not (self.classification and self.multiclass)
         ##############my addition###############
         self.n_species = n_species
+        self.another_model = another_model
+        self.args = args
         ########################################
 
     def create_encoder(self, args: Namespace):
@@ -148,6 +155,17 @@ class MoleculeModel(nn.Module):
         :param args: Arguments.
         """
         self.encoder = MPN(args)
+
+    ###########my addition##################
+    def create_another_model_encoder(self, args: Namespace):
+        """
+        Creates the message passing encoder for the model.
+
+        :param args: Arguments.
+        """
+        self.another_model_encoder = MPN(args=args,
+                                         atom_fdim=args.another_model_atom_descriptors_size,
+                                         another_model=True)
 
     def create_ffn(self, args: Namespace):
         """
@@ -169,29 +187,6 @@ class MoleculeModel(nn.Module):
         activation = get_activation_function(args.activation)
 
         # Create FFN layers
-        # if args.ffn_num_layers == 1:
-        #     ffn = [
-        #         dropout,
-        #         nn.Linear(first_linear_dim, args.output_size)
-        #     ]
-        # else:
-        #     ffn = [
-        #         dropout,
-        #         nn.Linear(first_linear_dim, args.ffn_hidden_size)
-        #     ]
-        #     for _ in range(args.ffn_num_layers - 2):
-        #         ffn.extend([
-        #             activation,
-        #             dropout,
-        #             nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size),
-        #         ])
-        #     ffn.extend([
-        #         activation,
-        #         dropout,
-        #         nn.Linear(args.ffn_hidden_size, args.output_size),
-        #     ])
-
-        # Create FFN layers
         if args.ffn_num_layers == 1:
             ffn = [
                 dropout,
@@ -202,26 +197,49 @@ class MoleculeModel(nn.Module):
                 dropout,
                 nn.Linear(first_linear_dim, args.ffn_hidden_size)
             ]
-            layers_input_size = args.ffn_hidden_size
-            layers_output_size = args.ffn_hidden_size
-            for i in range(args.ffn_num_layers - 2):
-                layers_output_size = int(layers_input_size * 0.5)
+            for _ in range(args.ffn_num_layers - 2):
                 ffn.extend([
                     activation,
                     dropout,
-                    nn.Linear(layers_input_size, layers_output_size),
+                    nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size),
                 ])
-                layers_input_size = layers_output_size
-                # ffn.extend([
-                #     activation,
-                #     dropout,
-                #     nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size),
-                # ])
             ffn.extend([
                 activation,
                 dropout,
-                nn.Linear(layers_output_size, args.output_size),
+                nn.Linear(args.ffn_hidden_size, args.output_size),
             ])
+
+        # Create FFN layers
+        # if args.ffn_num_layers == 1:
+        #     ffn = [
+        #         dropout,
+        #         nn.Linear(first_linear_dim, args.output_size)
+        #     ]
+        # else:
+        #     ffn = [
+        #         dropout,
+        #         nn.Linear(first_linear_dim, args.ffn_hidden_size)
+        #     ]
+        #     layers_input_size = args.ffn_hidden_size
+        #     layers_output_size = args.ffn_hidden_size
+        #     for i in range(args.ffn_num_layers - 2):
+        #         layers_output_size = int(layers_input_size * 0.5)
+        #         ffn.extend([
+        #             activation,
+        #             dropout,
+        #             nn.Linear(layers_input_size, layers_output_size),
+        #         ])
+        #         layers_input_size = layers_output_size
+        #         # ffn.extend([
+        #         #     activation,
+        #         #     dropout,
+        #         #     nn.Linear(args.ffn_hidden_size, args.ffn_hidden_size),
+        #         # ])
+        #     ffn.extend([
+        #         activation,
+        #         dropout,
+        #         nn.Linear(layers_output_size, args.output_size),
+        #     ])
 
 
         # Create FFN model
@@ -232,7 +250,14 @@ class MoleculeModel(nn.Module):
             self.ffn = nn.Sequential(*ffn)
         ###########################################
 
-    def forward(self, *input):
+    def forward(self,
+                batch,
+                features_batch,
+                atom_descriptors_batch,
+                atom_features_batch,
+                bond_features_batch,
+                species_batch,
+                another_model_atom_descriptors_batch):
         """
         Runs the MoleculeModel on input.
 
@@ -241,9 +266,21 @@ class MoleculeModel(nn.Module):
         """
 
         #############my addition##############
-        encoder_output = self.encoder(*input[:-1])
-        if input[-1][0]:
-            output = self.ffn(input[-1], encoder_output)
+        encoder_output = self.encoder(batch,
+                                      features_batch,
+                                      atom_descriptors_batch,
+                                      bond_features_batch)
+        if self.another_model:
+            # set_extra_atom_fdim(self.args.another_model_atom_descriptors_size)
+            another_model_encoder_output = self.another_model_encoder(
+                batch,
+                features_batch,
+                another_model_atom_descriptors_batch,
+                bond_features_batch
+            )
+            encoder_output += another_model_encoder_output
+        if species_batch[0]:
+            output = self.ffn(species_batch, encoder_output)
         else:
             output = self.ffn(encoder_output)
         ######################################
@@ -284,10 +321,15 @@ def build_model(args: Namespace) -> nn.Module:
     if args.dataset_type == 'multiclass':
         args.output_size *= args.multiclass_num_classes
 
+    another_model = True if args.another_model_atom_descriptors_path is not None else False
     model = MoleculeModel(classification=args.dataset_type == 'classification',
                           multiclass=args.dataset_type == 'multiclass',
-                          n_species=args.n_species)
+                          n_species=args.n_species,
+                          another_model=another_model,
+                          args=args)
     model.create_encoder(args)
+    if another_model:
+        model.create_another_model_encoder(args)
     model.create_ffn(args)
 
     initialize_weights(model)

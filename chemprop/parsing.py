@@ -62,6 +62,8 @@ def add_predict_args(parser: ArgumentParser):
                         help=' Path to the extra atom descriptors.')
     parser.add_argument('--bond_features_path', type=str, default=None,
                         help='Path to the extra bond descriptors that will be used as bond features to featurize a given molecule.')
+    parser.add_argument('--another_model_atom_descriptors_path', type=str, nargs='+', default=None,
+                        help='Path to file with atom features for train another MPN model')
     ##########################################
 
 def add_train_args(parser: ArgumentParser):
@@ -220,7 +222,7 @@ def add_train_args(parser: ArgumentParser):
                         help=' Path to the extra atom descriptors.')
     parser.add_argument('--bond_features_path', type=str, default=None,
                         help='Path to the extra bond descriptors that will be used as bond features to featurize a given molecule.')
-    parser.add_argument('--atom_descriptors', type=str, default='feature',
+    parser.add_argument('--atom_descriptors', type=str, default='descriptor',
                         choices=['feature', 'descriptor'],
                         help=' Custom extra atom descriptors. '
                              ':code:`feature`: used as atom features to featurize a given molecule. '
@@ -235,6 +237,10 @@ def add_train_args(parser: ArgumentParser):
     )
     parser.add_argument('--ffn_layers', type=int, nargs="+", default=None, help="FFN model layers"
     )
+    parser.add_argument('--another_model_atom_descriptors_path', type=str, nargs='+', default=None,
+                        help='Path to file with atom features for train another MPN model')
+    parser.add_argument('--another_model_test_atom_descriptors_path', type=str, nargs='+', default=None,
+                        help='Path to file with atom features for test another MPN model')
     #########################
 
 

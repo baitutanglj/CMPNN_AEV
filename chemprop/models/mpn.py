@@ -171,17 +171,18 @@ class MPN(nn.Module):
                  args: Namespace,
                  atom_fdim: int = None,
                  bond_fdim: int = None,
-                 graph_input: bool = False):
+                 graph_input: bool = False,
+                 another_model: bool = False):
         super(MPN, self).__init__()
         self.args = args
         ###############my addition#######
         self.use_input_features = args.use_input_features
         self.features_only = args.features_only
         self.device = args.device
-        self.overwrite_default_atom_features = args.overwrite_default_atom_features
+        self.another_model = another_model
         self.split_model = args.split_model
         ##################################
-        self.atom_fdim = atom_fdim or get_atom_fdim(args)
+        self.atom_fdim = atom_fdim or get_atom_fdim(args.overwrite_default_atom_features)
         self.bond_fdim = bond_fdim or get_bond_fdim(args) + \
                             (not args.atom_messages) * self.atom_fdim # * 2
         self.graph_input = graph_input
@@ -190,8 +191,7 @@ class MPN(nn.Module):
     def forward(self, batch: Union[List[str], BatchMolGraph],
                 features_batch: List[np.ndarray] = None,
                 atom_descriptors_batch: List[np.ndarray] = None,
-                atom_features_batch: List[np.ndarray] = None,
-                bond_features_batch: List[np.ndarray] = None
+                bond_features_batch: List[np.ndarray] = None,
                 ) -> torch.FloatTensor:
 
         ###################my addition####################
@@ -205,8 +205,9 @@ class MPN(nn.Module):
         if not self.graph_input:  # if features only, batch won't even be used
             # batch = mol2graph(batch, self.args)
             batch = mol2graph(batch, self.args,
-                              atom_features_batch,
-                              bond_features_batch)
+                              atom_descriptors_batch,
+                              bond_features_batch,
+                              self.another_model)
         ###################################################
 
         # split_model==True-->output:(mol_num,max_atoms_num,feature_size)

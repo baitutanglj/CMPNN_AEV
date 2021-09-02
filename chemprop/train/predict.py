@@ -39,6 +39,7 @@ def predict(model: nn.Module,
             species_batch = nn.utils.rnn.pad_sequence(
                 mol_batch.species(), batch_first=True, padding_value=-1
             )
+        another_model_atom_descriptors_batch = mol_batch.another_model_atom_descriptors()
         ####################################
 
         # Run model
@@ -46,7 +47,8 @@ def predict(model: nn.Module,
 
         with torch.no_grad():
             batch_preds = model(batch, features_batch, atom_descriptors_batch,
-                                atom_features_batch, bond_features_batch, species_batch)
+                                atom_features_batch, bond_features_batch,
+                                species_batch, another_model_atom_descriptors_batch)
         batch_preds = batch_preds.data.cpu().numpy()
 
         # Inverse scale if regression

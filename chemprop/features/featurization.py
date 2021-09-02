@@ -6,6 +6,7 @@ import torch
 import numpy as np
 from itertools import zip_longest
 
+
 # Atom feature sizes
 MAX_ATOMIC_NUM = 100
 ATOM_FEATURES = {
@@ -38,12 +39,14 @@ EXTRA_BOND_FDIM = 0
 ########################################
 # Memoization
 SMILES_TO_GRAPH = {}
-
+SMILES_TO_GRAPH_2 = {}
 
 def clear_cache():
     """Clears featurization cache."""
     global SMILES_TO_GRAPH
+    global SMILES_TO_GRAPH_2
     SMILES_TO_GRAPH = {}
+    SMILES_TO_GRAPH_2 = {}
 
 
 # def get_atom_fdim(args: Namespace) -> int:
@@ -54,14 +57,14 @@ def clear_cache():
 #     """
 #     return ATOM_FDIM
 #################my addition###################
-def get_atom_fdim(args: Namespace) -> int:
+def get_atom_fdim(overwrite_default_atom_features: bool=False) -> int:
     """
     Gets the dimensionality of the atom feature vector.
 
     :param overwrite_default_atom: Whether to overwrite the default atom descriptors
     :return: The dimensionality of the atom feature vector.
     """
-    return (not args.overwrite_default_atom_features) * ATOM_FDIM + EXTRA_ATOM_FDIM
+    return (not overwrite_default_atom_features) * ATOM_FDIM + EXTRA_ATOM_FDIM
 
 
 def set_extra_atom_fdim(extra):
@@ -160,9 +163,11 @@ class MolGraph:
     - b2revb: A mapping from a bond index to the index of the reverse bond.
     """
 
-    def __init__(self, smiles: str, args: Namespace,
+    def __init__(self, smiles: str,
+                 args: Namespace,
                  atom_features_extra=None,
-                 bond_features_extra: np.ndarray = None):
+                 bond_features_extra: np.ndarray = None,
+                 overwrite_default_atom_features: bool = None):
         """
         Computes the graph structure and featurization of a molecule.
 
@@ -181,7 +186,8 @@ class MolGraph:
         self.bonds = []
         #############my addition###############
         self.atom_features_extra = atom_features_extra
-        self.overwrite_default_atom_features = args.overwrite_default_atom_features
+        self.overwrite_default_atom_features = overwrite_default_atom_features if \
+            overwrite_default_atom_features is not None else args.overwrite_default_atom_features
         # self.extra_atom_fdim = args.extra_atom_fdim
         #######################################
         # # Convert smiles to molecule
@@ -279,11 +285,12 @@ class BatchMolGraph:
     - a2a: (Optional): A mapping from an atom index to neighboring atom indices.
     """
 
-    def __init__(self, mol_graphs: List[MolGraph], args: Namespace):
+    def __init__(self, mol_graphs: List[MolGraph],
+                 args: Namespace,
+                 atom_fdim: int=None):
         self.smiles_batch = [mol_graph.smiles for mol_graph in mol_graphs]
         self.n_mols = len(self.smiles_batch)
-
-        self.atom_fdim = get_atom_fdim(args)
+        self.atom_fdim = atom_fdim if atom_fdim is not None else get_atom_fdim(args.overwrite_default_atom_features)
         self.bond_fdim = get_bond_fdim(args) + (not args.atom_messages) * self.atom_fdim # * 2
 
         # Start n_atoms and n_bonds at 1 b/c zero padding
@@ -373,8 +380,9 @@ class BatchMolGraph:
 
 def mol2graph(smiles_batch: List[str],
               args: Namespace,
-              atom_features_batch: List[np.ndarray] = None,
-              bond_features_batch: List[np.ndarray] = None
+              atom_descriptors_batch: List[np.ndarray] = None,
+              bond_features_batch: List[np.ndarray] = None,
+              another_model: bool = False,
               ) -> BatchMolGraph:
     """
     Converts a list of SMILES strings to a BatchMolGraph containing the batch of molecular graphs.
@@ -385,31 +393,41 @@ def mol2graph(smiles_batch: List[str],
     """
     mol_graphs = []
     ##############my addition###############
-    if (atom_features_batch is not None) and (bond_features_batch is not None):
-        for smiles, atom_features, bond_features in zip(smiles_batch, atom_features_batch, bond_features_batch):
+    if (atom_descriptors_batch is not None) and (bond_features_batch is not None):
+        for smiles, atom_descriptors, bond_features in zip(smiles_batch, atom_descriptors_batch, bond_features_batch):
             if smiles in SMILES_TO_GRAPH:
                 mol_graph = SMILES_TO_GRAPH[smiles]
             else:
-                mol_graph = MolGraph(smiles, args, atom_features, bond_features)
+                mol_graph = MolGraph(smiles, args, atom_descriptors, bond_features, args.overwrite_default_atom_features)
                 if not args.no_cache:
                     SMILES_TO_GRAPH[smiles] = mol_graph
             mol_graphs.append(mol_graph)
-    elif (atom_features_batch is not None) and (bond_features_batch is None):
-        for smiles, atom_features in zip(smiles_batch, atom_features_batch):
-            if smiles in SMILES_TO_GRAPH:
-                mol_graph = SMILES_TO_GRAPH[smiles]
-            else:
-                mol_graph = MolGraph(smiles, args, atom_features,None)
-                if not args.no_cache:
-                    SMILES_TO_GRAPH[smiles] = mol_graph
-            mol_graphs.append(mol_graph)
+    elif (atom_descriptors_batch is not None) and (bond_features_batch is None):
+        for smiles, atom_descriptors in zip(smiles_batch, atom_descriptors_batch):
+            if another_model:
+                if smiles in SMILES_TO_GRAPH_2:
+                    mol_graph = SMILES_TO_GRAPH_2[smiles]
+                else:
+                    mol_graph = MolGraph(smiles, args, atom_descriptors, None, True)
+                    if not args.no_cache:
+                        SMILES_TO_GRAPH_2[smiles] = mol_graph
+                mol_graphs.append(mol_graph)
 
-    elif (atom_features_batch is None) and (bond_features_batch is not None):
+            else:
+                if smiles in SMILES_TO_GRAPH:
+                    mol_graph = SMILES_TO_GRAPH[smiles]
+                else:
+                    mol_graph = MolGraph(smiles, args, atom_descriptors, None, args.overwrite_default_atom_features)
+                    if not args.no_cache:
+                        SMILES_TO_GRAPH[smiles] = mol_graph
+                mol_graphs.append(mol_graph)
+
+    elif (atom_descriptors_batch is None) and (bond_features_batch is not None):
         for smiles, bond_features in zip(smiles_batch, bond_features_batch):
             if smiles in SMILES_TO_GRAPH:
                 mol_graph = SMILES_TO_GRAPH[smiles]
             else:
-                mol_graph = MolGraph(smiles, args, None, bond_features)
+                mol_graph = MolGraph(smiles, args, None, bond_features, args.overwrite_default_atom_features)
                 if not args.no_cache:
                     SMILES_TO_GRAPH[smiles] = mol_graph
             mol_graphs.append(mol_graph)
@@ -419,9 +437,11 @@ def mol2graph(smiles_batch: List[str],
             if smiles in SMILES_TO_GRAPH:
                 mol_graph = SMILES_TO_GRAPH[smiles]
             else:
-                mol_graph = MolGraph(smiles, args, None, None)
+                mol_graph = MolGraph(smiles, args, None, None, args.overwrite_default_atom_features)
                 if not args.no_cache:
                     SMILES_TO_GRAPH[smiles] = mol_graph
             mol_graphs.append(mol_graph)
-
-    return BatchMolGraph(mol_graphs, args)
+    if not another_model:
+        return BatchMolGraph(mol_graphs, args, None)
+    else:
+        return BatchMolGraph(mol_graphs, args, args.another_model_atom_descriptors_size)

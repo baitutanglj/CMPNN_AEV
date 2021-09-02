@@ -54,15 +54,18 @@ def run_training(args: Namespace, logger: Logger = None) -> List[float]:
     args.features_size = data.features_size()
     debug(f'Number of tasks = {args.num_tasks}')
     #################my addition###################
-    if args.atom_descriptors == 'descriptor':
-        args.atom_descriptors_size = data.atom_descriptors_size()
-        args.ffn_hidden_size += args.atom_descriptors_size
-    elif args.atom_descriptors == 'feature':
+    if args.atom_descriptors == 'feature':
         args.atom_features_size = data.atom_features_size()
-        set_extra_atom_fdim(args.atom_features_size)
+        args.ffn_hidden_size += args.atom_features_size
+    elif args.atom_descriptors == 'descriptor':
+        args.atom_descriptors_size = data.atom_descriptors_size()
+        set_extra_atom_fdim(args.atom_descriptors_size)
     if args.bond_features_path is not None:
         args.bond_features_size = data.bond_features_size()
         set_extra_bond_fdim(args.bond_features_size)
+    if args.another_model_atom_descriptors_path is not None:
+        args.another_model_atom_descriptors_size = data.another_model_atom_descriptors_size()
+        # set_extra_atom_fdim(args.another_model_atom_descriptors_size)
 
     debug(f'Number of tasks = {args.num_tasks}')
     ###############################################
@@ -72,7 +75,9 @@ def run_training(args: Namespace, logger: Logger = None) -> List[float]:
     if args.separate_test_path:
         test_data = get_data(path=args.separate_test_path, args=args,
                              features_path=args.separate_test_features_path,
-                             atom_descriptors_path=args.separate_test_atom_descriptors_path, logger=logger)
+                             atom_descriptors_path=args.separate_test_atom_descriptors_path,
+                             another_model_atom_descriptors_path=args.another_model_test_atom_descriptors_path,
+                             logger=logger)
     if args.separate_val_path:
         val_data = get_data(path=args.separate_val_path, args=args,
                             features_path=args.separate_val_features_path,

@@ -23,7 +23,9 @@ class MoleculeDatapoint:
                  bond_features: np.ndarray = None,
                  species:np.ndarray = None,
                  overwrite_default_atom_features: bool = False,
-                 overwrite_default_bond_features: bool = False):
+                 overwrite_default_bond_features: bool = False,
+                 another_model_atom_descriptors: np.ndarray = None,
+                 another_species:np.ndarray = None,):
         """
         Initializes a MoleculeDatapoint, which contains a single molecule.
 
@@ -35,6 +37,7 @@ class MoleculeDatapoint:
         :param bond_features: A numpy array containing additional bond features to featurize the molecule
         :param overwrite_default_atom_features: Boolean to overwrite default atom features by atom_features
         :param overwrite_default_bond_features: Boolean to overwrite default bond features by bond_features
+        :param another_model_atom_descriptors: A numpy array containing atom descriptors to featurize the molecule for another MPN model
         """
         if args is not None:
             self.features_generator = args.features_generator
@@ -66,6 +69,8 @@ class MoleculeDatapoint:
         self.species = species
         self.overwrite_default_atom_features = overwrite_default_atom_features
         self.overwrite_default_bond_features = overwrite_default_bond_features
+        self.another_model_atom_descriptors = another_model_atom_descriptors
+        self.another_species = another_species
         ####################################################
 
         # Generate additional features if given a generator
@@ -96,10 +101,17 @@ class MoleculeDatapoint:
         if self.bond_features is not None:
             self.bond_features = np.where(np.isnan(self.bond_features), replace_token, self.bond_features)
 
+        # Fix nans in another_model_atom_descriptors
+        if self.another_model_atom_descriptors is not None:
+            self.another_model_atom_descriptors = np.where(np.isnan(self.another_model_atom_descriptors),
+                                                           replace_token, self.another_model_atom_descriptors)
+
+
         # Save a copy of the raw features and targets to enable different scaling later on
         self.raw_features, self.raw_targets = self.features, self.targets
         self.raw_atom_descriptors, self.raw_atom_features, self.raw_bond_features = \
             self.atom_descriptors, self.atom_features, self.bond_features
+        self.raw_another_model_atom_descriptors = self.another_model_atom_descriptors
 
     def set_features(self, features: np.ndarray):
         """
@@ -149,6 +161,22 @@ class MoleculeDatapoint:
         :param bond_features: A 1D numpy array of features for the molecule.
         """
         self.bond_features = bond_features
+
+    def set_another_model_atom_descriptors(self, another_model_atom_descriptors: np.ndarray) -> None:
+        """
+        Sets the another_model_atom_descriptors of the molecule.
+
+        :param another_model_atom_descriptors: A 1D numpy array of features for the molecule.
+        """
+        self.another_model_atom_descriptors = another_model_atom_descriptors
+
+    def set_another_species(self,another_species:List[Union[str,float]]):
+        """
+        Sets the another model atoms species of a molecule.
+
+        :param another_species: A list containing the species message.
+        """
+        self.another_species = another_species
 
     def extend_features(self, features: np.ndarray) -> None:
         """
@@ -321,6 +349,34 @@ class MoleculeDataset(Dataset):
         """
         return len(self.data[0].bond_features[0]) \
             if len(self.data) > 0 and self.data[0].bond_features is not None else None
+
+    def another_model_atom_descriptors(self) -> List[np.ndarray]:
+        """
+        Returns the another_model_atom_descriptors associated with each molecule (if they exit).
+
+        :return: A list of 2D numpy arrays containing the atom descriptors
+                 for each molecule or None if there are no features.
+        """
+        if len(self.data) == 0 or self.data[0].another_model_atom_descriptors is None:
+            return None
+        return [d.another_model_atom_descriptors for d in self.data]
+    def another_species(self) -> List:
+        """
+        Returns the species associated with the molecules.
+
+        :return: A list of species tensor.
+        """
+        return [d.another_species for d in self.data]
+    def another_model_atom_descriptors_size(self) -> int:
+        """
+        Returns the size of custom additional another_model_atom_descriptors vector associated with the molecules.
+
+        :return: The size of the additional another_model_atom_descriptors vector.
+        """
+        return len(self.data[0].another_model_atom_descriptors[0]) \
+            if len(self.data) > 0 and self.data[0].another_model_atom_descriptors\
+               is not None else None
+
     ################################
 
     def shuffle(self, seed: int = None):

@@ -100,6 +100,10 @@ def filter_invalid_smiles(data: MoleculeDataset) -> MoleculeDataset:
     :param data: A MoleculeDataset.
     :return: A MoleculeDataset with only valid molecules.
     """
+    for datapoint in data:
+        if datapoint.smiles != '' and datapoint.mol is  None:
+            print(datapoint.smiles)
+
     return MoleculeDataset([datapoint for datapoint in data
                             if datapoint.smiles != '' and datapoint.mol is not None
                             and datapoint.mol.GetNumHeavyAtoms() > 0])
@@ -116,7 +120,8 @@ def get_data(path: str,
              smiles_columns:str=None,
              target_columns: List[str] = None,
              atom_descriptors_path: str = None,
-             bond_features_path: str = None) -> MoleculeDataset:
+             bond_features_path: str = None,
+             another_model_atom_descriptors_path: str = None) -> MoleculeDataset:
     """
     Gets smiles string and target values (and optionally compound names if provided) from a CSV file.
 
@@ -138,6 +143,7 @@ def get_data(path: str,
                            except the :code:`smiles_column` and the :code:`ignore_columns`.
     :param atom_descriptors_path: The path to the file containing the custom atom descriptors.
     :param bond_features_path: The path to the file containing the custom bond features.
+    :param another_model_atom_descriptors_path: Path to file with atom features for another MPN model
     """
     debug = logger.debug if logger is not None else print
     if args is not None:
@@ -152,6 +158,9 @@ def get_data(path: str,
             else args.atom_descriptors_path
         bond_features_path = bond_features_path if bond_features_path is not None \
             else args.bond_features_path
+        another_model_atom_descriptors_path = another_model_atom_descriptors_path if \
+            another_model_atom_descriptors_path is not None \
+            else args.another_model_atom_descriptors_path
         ############################################
     else:
         use_compound_names = False
@@ -196,44 +205,63 @@ def get_data(path: str,
             if len(lines) >= max_data_size:
                 break
 
-        atom_features = None
-        atom_descriptors = None
-        species = None
-        if args is not None and args.atom_descriptors is not None:
-            try:
-                descriptors, species = load_valid_atom_or_bond_features(atom_descriptors_path, [x[0] for x in all_smiles],
-                                                               split_model=args.split_model)
-            except Exception as e:
-                raise ValueError(f'Failed to load or validate custom atomic descriptors or features: {e}')
+    atom_features = None
+    atom_descriptors = None
+    species = None
+    if args is not None and args.atom_descriptors is not None:
+        try:
+            descriptors, species = load_valid_atom_or_bond_features(atom_descriptors_path, [x[0] for x in all_smiles],
+                                                           split_model=args.split_model)
+        except Exception as e:
+            raise ValueError(f'Failed to load or validate custom atomic descriptors or features: {e}')
 
-            if args.atom_descriptors == 'feature':
-                atom_features = descriptors
-            elif args.atom_descriptors == 'descriptor':
-                atom_descriptors = descriptors
+        if args.atom_descriptors == 'feature':
+            atom_features = descriptors
+        elif args.atom_descriptors == 'descriptor':
+            atom_descriptors = descriptors
 
-        bond_features = None
-        if args is not None and args.bond_features_path is not None:
-            try:
-                bond_features = load_valid_atom_or_bond_features(bond_features_path, [x[0] for x in all_smiles],
-                                                                 split_model=False)
-            except Exception as e:
-                raise ValueError(f'Failed to load or validate custom bond features: {e}')
+    bond_features = None
+    if args is not None and args.bond_features_path is not None:
+        try:
+            bond_features = load_valid_atom_or_bond_features(bond_features_path, [x[0] for x in all_smiles],
+                                                             split_model=False)
+        except Exception as e:
+            raise ValueError(f'Failed to load or validate custom bond features: {e}')
 
 
-        data = MoleculeDataset([
-            MoleculeDatapoint(
-                smiles=smiles,
-                targets=targets,
-                args=args,
-                features=features_data[i] if features_data is not None else None,
-                atom_features=atom_features[i] if atom_features is not None else None,
-                atom_descriptors=atom_descriptors[i] if atom_descriptors is not None else None,
-                bond_features=bond_features[i] if bond_features is not None else None,
-                species=species[i] if species is not None else None,
-                overwrite_default_atom_features=args.overwrite_default_atom_features if args is not None else False,
-                overwrite_default_bond_features=args.overwrite_default_bond_features if args is not None else False
-            ) for i, (smiles,targets) in tqdm(enumerate(zip(all_smiles,all_targets)), total=len(all_smiles))
-        ])
+    another_model_atom_descriptors = {}
+    another_species = {}
+    if args is not None and args.another_model_atom_descriptors_path is not None:
+
+        # Ensure list
+        if isinstance(another_model_atom_descriptors_path, str):
+            another_model_atom_descriptors_path = [another_model_atom_descriptors_path]
+        try:
+            for i in range(len(another_model_atom_descriptors_path)):
+                another_model_atom_descriptors[i], another_species[i] = load_valid_atom_or_bond_features(
+                    another_model_atom_descriptors_path[i], [x[0] for x in all_smiles],
+                    split_model=args.split_model)
+
+        except Exception as e:
+            raise ValueError(f'Failed to load or validate custom atomic descriptors or features: {e}')
+
+
+    data = MoleculeDataset([
+        MoleculeDatapoint(
+            smiles=smiles,
+            targets=targets,
+            args=args,
+            features=features_data[i] if features_data is not None else None,
+            atom_features=atom_features[i] if atom_features is not None else None,
+            atom_descriptors=atom_descriptors[i] if atom_descriptors is not None else None,
+            bond_features=bond_features[i] if bond_features is not None else None,
+            species=species[i] if species is not None else None,
+            overwrite_default_atom_features=args.overwrite_default_atom_features if args is not None else False,
+            overwrite_default_bond_features=args.overwrite_default_bond_features if args is not None else False,
+            another_model_atom_descriptors =  another_model_atom_descriptors[0][i] if another_model_atom_descriptors[0] is not None else None,
+            another_species=another_species[0][i] if another_species[0] is not None else None,
+        ) for i, (smiles,targets) in tqdm(enumerate(zip(all_smiles,all_targets)), total=len(all_smiles))
+    ])
 
     # Filter out invalid SMILES
     if skip_invalid_smiles:
