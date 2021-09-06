@@ -182,8 +182,8 @@ class MoleculeModel(nn.Module):
             first_linear_dim = args.hidden_size * 1
             if args.use_input_features:
                 first_linear_dim += args.features_dim
-                if self.another_model:
-                    first_linear_dim *= 2
+            if self.another_model:
+                first_linear_dim *= 2
 
         dropout = nn.Dropout(args.dropout)
         activation = get_activation_function(args.activation)
