@@ -90,10 +90,14 @@ def load_pdbs(
     # Rename ligand consistently
     lig.residues.resnames = "LIG"
 
+
+    ############my addition###############
+    system_path = recfile.split('_protein')[0]+'_system.pdb'
+    ######################################
     # Merge receptor and ligand in single universe
     system = mda.core.universe.Merge(lig, rec)
 
-    return system
+    return system, system_path
 
 
 def _universe_from_openbabel(obmol):
@@ -214,7 +218,8 @@ def load_mols(
 
 
 def select(
-    system: mda.Universe, distance: float, removeHs: bool = False
+    system: mda.Universe, distance: float, removeHs: bool = False,
+    system_path: str= None
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Select binding site.
@@ -227,7 +232,8 @@ def select(
         Ligand-residues distance
     removeHs: bool
         Remove hydrogen atoms
-
+    system_path: str
+            Paths to save resselection pdb file
     Returns
     -------
     Tuple[np.ndarray, np.ndarray]
@@ -249,9 +255,13 @@ def select(
         mask = resselection.elements != "H"
         # Elements from PDB file needs MDAnalysis@develop (see #2648)
         # return resselection.elements[mask], resselection.positions[mask]
+        # if system_path:
+            # resselection[mask].write(system_path)
         return resselection[mask], resselection.elements[mask], resselection.positions[mask]
     else:
         # return resselection.elements, resselection.positions
+        # if system_path:
+            # resselection[mask].write(system_path)
         return resselection, resselection.elements, resselection.positions
 
 
@@ -284,9 +294,9 @@ def load_pdbs_and_select(
     -----
     Combines :func:`load_pdbs` and :func:`select`.
     """
-    system = load_pdbs(ligand, receptor, datapaths)
+    system, system_path = load_pdbs(ligand, receptor, datapaths)
 
-    return select(system, distance, removeHs=removeHs)
+    return select(system, distance, removeHs=removeHs, system_path=system_path)
 
 
 def load_mols_and_select(

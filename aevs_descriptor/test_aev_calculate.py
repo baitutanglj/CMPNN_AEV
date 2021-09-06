@@ -61,7 +61,7 @@ def test_aev_from_loader(args):
         aev = AEVC.forward((species, coordinates)).aevs
         aevs.append(aev[0,maskLIG].cpu().numpy())
         aevs_species.append(species[0,maskLIG].cpu().numpy())
-    df = pd.DataFrame({'features': aevs, 'species': aevs_species}, index=data.ids)
+    df = pd.DataFrame({'features':aevs, 'species':aevs_species},index=data.ids)
     # df.to_pickle('/mnt/home/linjie/projects/aescore/aevs_descriptor/result/aevs.pkl')
     df.to_pickle(args.outpath)
     return aevs

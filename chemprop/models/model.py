@@ -182,6 +182,8 @@ class MoleculeModel(nn.Module):
             first_linear_dim = args.hidden_size * 1
             if args.use_input_features:
                 first_linear_dim += args.features_dim
+                if self.another_model:
+                    first_linear_dim *= 2
 
         dropout = nn.Dropout(args.dropout)
         activation = get_activation_function(args.activation)
@@ -278,7 +280,8 @@ class MoleculeModel(nn.Module):
                 another_model_atom_descriptors_batch,
                 bond_features_batch
             )
-            encoder_output += another_model_encoder_output
+            # encoder_output += another_model_encoder_output
+            encoder_output = torch.cat((encoder_output, another_model_encoder_output),1)
         if species_batch[0]:
             output = self.ffn(species_batch, encoder_output)
         else:
@@ -327,10 +330,13 @@ def build_model(args: Namespace) -> nn.Module:
                           n_species=args.n_species,
                           another_model=another_model,
                           args=args)
-    model.create_encoder(args)
-    if another_model:
-        model.create_another_model_encoder(args)
-    model.create_ffn(args)
+    if args.features_only:
+        model.create_ffn(args)
+    else:
+        model.create_encoder(args)
+        if another_model:
+            model.create_another_model_encoder(args)
+        model.create_ffn(args)
 
     initialize_weights(model)
 

@@ -3,6 +3,7 @@ from typing import List
 import torch
 import torch.nn as nn
 from tqdm import trange
+import numpy as np
 
 from chemprop.data import MoleculeDataset, StandardScaler
 
@@ -50,10 +51,10 @@ def predict(model: nn.Module,
                                 atom_features_batch, bond_features_batch,
                                 species_batch, another_model_atom_descriptors_batch)
         batch_preds = batch_preds.data.cpu().numpy()
-
         # Inverse scale if regression
         if scaler is not None:
             batch_preds = scaler.inverse_transform(batch_preds)
+            batch_preds = np.around(batch_preds.astype(float), decimals=3)
 
         # Collect vectors
         batch_preds = batch_preds.tolist()

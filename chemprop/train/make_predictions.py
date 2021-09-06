@@ -65,10 +65,10 @@ def make_predictions(args: Namespace, smiles: List[str] = None) -> List[Optional
     #################my addition###################
     if args.atom_descriptors == 'descriptor':
         args.atom_descriptors_size = test_data.atom_descriptors_size()
-        args.ffn_hidden_size += args.atom_descriptors_size
+        set_extra_atom_fdim(args.atom_descriptors_size)
     elif args.atom_descriptors == 'feature':
         args.atom_features_size = test_data.atom_features_size()
-        set_extra_atom_fdim(args.atom_features_size)
+        args.ffn_hidden_size += args.atom_features_size
     if args.bond_features_path is not None:
         args.bond_features_size = test_data.bond_features_size()
         set_extra_bond_fdim(args.bond_features_size)
@@ -93,7 +93,7 @@ def make_predictions(args: Namespace, smiles: List[str] = None) -> List[Optional
 
     # Ensemble predictions
     avg_preds = sum_preds / len(args.checkpoint_paths)
-    avg_preds = np.round(avg_preds,4)
+    avg_preds = np.round(avg_preds,3)
     avg_preds = avg_preds.tolist()
 
     #get metric
