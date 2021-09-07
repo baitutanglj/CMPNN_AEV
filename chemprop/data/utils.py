@@ -258,8 +258,8 @@ def get_data(path: str,
             species=species[i] if species is not None else None,
             overwrite_default_atom_features=args.overwrite_default_atom_features if args is not None else False,
             overwrite_default_bond_features=args.overwrite_default_bond_features if args is not None else False,
-            another_model_atom_descriptors =  another_model_atom_descriptors[0][i] if another_model_atom_descriptors[0] is not None else None,
-            another_species=another_species[0][i] if another_species[0] is not None else None,
+            another_model_atom_descriptors =  another_model_atom_descriptors[0][i] if another_model_atom_descriptors else None,
+            another_species=another_species[0][i] if another_species else None,
         ) for i, (smiles,targets) in tqdm(enumerate(zip(all_smiles,all_targets)), total=len(all_smiles))
     ])
 

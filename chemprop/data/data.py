@@ -88,6 +88,7 @@ class MoleculeDatapoint:
         replace_token = 0
         if self.features is not None:
             self.features = np.where(np.isnan(self.features), replace_token, self.features)
+            self.features = np.where(np.isinf(self.features), 1, self.features)
 
         # Fix nans in atom_descriptors
         if self.atom_descriptors is not None:

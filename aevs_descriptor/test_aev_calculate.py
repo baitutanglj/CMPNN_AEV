@@ -54,6 +54,7 @@ def test_aev_from_loader(args):
 
     aevs = []
     aevs_species = []
+    aevs_protein = []
     for maskLIG, species, coordinates in zip(data.maskLIG, data.species, data.coordinates):
         # Move everything to device
         species = torch.unsqueeze(species, 0).to(device)
@@ -61,9 +62,12 @@ def test_aev_from_loader(args):
         aev = AEVC.forward((species, coordinates)).aevs
         aevs.append(aev[0,maskLIG].cpu().numpy())
         aevs_species.append(species[0,maskLIG].cpu().numpy())
+        aevs_protein.append(aev[0, ~maskLIG].cpu().numpy())
     df = pd.DataFrame({'features':aevs, 'species':aevs_species},index=data.ids)
+    df2 = pd.DataFrame({'protein_features': aevs_protein}, index=data.ids)
     # df.to_pickle('/mnt/home/linjie/projects/aescore/aevs_descriptor/result/aevs.pkl')
     df.to_pickle(args.outpath)
+    df2.to_pickle(os.path.join(os.path.dirname(args.outpath), 'test_aev_protein.pkl'))
     return aevs
 
 
