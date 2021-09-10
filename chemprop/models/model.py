@@ -268,20 +268,23 @@ class MoleculeModel(nn.Module):
         """
 
         #############my addition##############
-        encoder_output = self.encoder(batch,
-                                      features_batch,
-                                      atom_descriptors_batch,
-                                      bond_features_batch)
-        if self.another_model:
-            # set_extra_atom_fdim(self.args.another_model_atom_descriptors_size)
-            another_model_encoder_output = self.another_model_encoder(
-                batch,
-                features_batch,
-                another_model_atom_descriptors_batch,
-                bond_features_batch
-            )
-            # encoder_output += another_model_encoder_output
-            encoder_output = torch.cat((encoder_output, another_model_encoder_output),1)
+        if self.args.use_input_features and self.args.features_only:
+            encoder_output = torch.from_numpy(np.stack(features_batch)).float().to(self.args.device)
+        else:
+            encoder_output = self.encoder(batch,
+                                          features_batch,
+                                          atom_descriptors_batch,
+                                          bond_features_batch)
+            if self.another_model:
+                # set_extra_atom_fdim(self.args.another_model_atom_descriptors_size)
+                another_model_encoder_output = self.another_model_encoder(
+                    batch,
+                    features_batch,
+                    another_model_atom_descriptors_batch,
+                    bond_features_batch
+                )
+                # encoder_output += another_model_encoder_output
+                encoder_output = torch.cat((encoder_output, another_model_encoder_output),1)
         if species_batch[0]:
             output = self.ffn(species_batch, encoder_output)
         else:
