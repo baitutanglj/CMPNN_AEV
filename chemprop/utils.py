@@ -74,7 +74,8 @@ def save_checkpoint(path: str,
 def load_checkpoint(path: str,
                     current_args: Namespace = None,
                     cuda: bool = None,
-                    logger: logging.Logger = None) -> MoleculeModel:
+                    logger: logging.Logger = None,
+                    gpu: int = None) -> MoleculeModel:
     """
     Loads a model checkpoint.
 
@@ -94,7 +95,7 @@ def load_checkpoint(path: str,
         args = current_args
 
     args.cuda = cuda if cuda is not None else args.cuda
-
+    args.gpu = gpu if gpu is not None else args.gpu
     # Build model
     model = build_model(args)
     model_state_dict = model.state_dict()
@@ -119,7 +120,7 @@ def load_checkpoint(path: str,
 
     if cuda:
         debug('Moving model to cuda')
-        model = model.cuda()
+        model = model.cuda(args.gpu)
 
     return model
 

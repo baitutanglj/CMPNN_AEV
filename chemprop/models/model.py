@@ -9,7 +9,8 @@ from typing import List, Optional
 import torch
 import numpy as np
 from chemprop.features import set_extra_atom_fdim
-
+from .transformer import make_encoder, make_model
+from .transformer_torch import TransformerModel
 
 class AtomicNN(nn.Module):
     """
@@ -36,7 +37,8 @@ class AtomicNN(nn.Module):
 
         if layers_sizes is None:
             # Default values from TorchANI turorial
-            self.layers_sizes: List[int] = [160, 128, 96, 1]
+            # self.layers_sizes: List[int] = [160, 128, 96, 1]
+            self.layers_sizes: List[int] = [256, 128, 64, 1]
         else:
             self.layers_sizes = layers_sizes.copy()
 
@@ -155,6 +157,39 @@ class MoleculeModel(nn.Module):
         :param args: Arguments.
         """
         self.encoder = MPN(args)
+    ############transformer#################
+    def create_transformer(self, args: Namespace):
+        """
+        Creates the message passing encoder for the model.
+
+        :param args: Arguments.
+        """
+        # self.transformer_model = make_encoder(d_model=args.hidden_size,
+        #                                         nhead=8,
+        #                                         d_ff=1024,
+        #                                         layers=6,
+        #                                         dropout=args.dropout,
+        #                                         device=args.gpu)
+        self.transformer_model = make_model(d_model=args.hidden_size,
+                                            nhead=8,
+                                            d_ff=1024,
+                                            layers=6,
+                                            dropout=args.dropout,
+                                            device=args.gpu,
+                                            src_vocab_size=args.protein_descriptors_size)
+
+
+    # def create_transformer(self, args:Namespace):
+    #     self.transformer_model = TransformerModel(d_model=args.hidden_size,
+    #                                               nhead=8,
+    #                                               dim_feedforward=1024,
+    #                                               num_encoder_layers=6,
+    #                                               num_decoder_layers=6,
+    #                                               dropout=args.dropout,
+    #                                               batch_first=True,
+    #                                               device=args.gpu,
+    #                                               protein_dim=args.protein_descriptors_size)
+    # ########################################
 
     ###########my addition##################
     def create_another_model_encoder(self, args: Namespace):
@@ -187,7 +222,6 @@ class MoleculeModel(nn.Module):
 
         dropout = nn.Dropout(args.dropout)
         activation = get_activation_function(args.activation)
-
         # Create FFN layers
         if args.ffn_num_layers == 1:
             ffn = [
@@ -250,6 +284,7 @@ class MoleculeModel(nn.Module):
             self.ffn = FFNModel(args.n_species, first_linear_dim, args.ffn_layers, args.dropout)
         else:
             self.ffn = nn.Sequential(*ffn)
+            # self.ffn = AtomicNN(first_linear_dim, layers_sizes=args.ffn_layers, dropp=args.dropout)
         ###########################################
 
     def forward(self,
@@ -259,7 +294,8 @@ class MoleculeModel(nn.Module):
                 atom_features_batch,
                 bond_features_batch,
                 species_batch,
-                another_model_atom_descriptors_batch):
+                another_model_atom_descriptors_batch ,
+                protein_descriptors_batch):
         """
         Runs the MoleculeModel on input.
 
@@ -275,6 +311,14 @@ class MoleculeModel(nn.Module):
                                           features_batch,
                                           atom_descriptors_batch,
                                           bond_features_batch)
+
+            ############transformer##############
+        if self.args.use_transformer:
+            # encoder_output = [torch.from_numpy(x).cuda(self.args.gpu) for x in atom_descriptors_batch]
+            # encoder_output = self.transformer_model(src=protein_descriptors_bath, tgt=encoder_output)
+            encoder_output = self.transformer_model(src=protein_descriptors_batch,tgt=encoder_output)
+            ######################################
+
             if self.another_model:
                 # set_extra_atom_fdim(self.args.another_model_atom_descriptors_size)
                 another_model_encoder_output = self.another_model_encoder(
@@ -337,6 +381,8 @@ def build_model(args: Namespace) -> nn.Module:
         model.create_ffn(args)
     else:
         model.create_encoder(args)
+        if args.use_transformer:
+            model.create_transformer(args)
         if another_model:
             model.create_another_model_encoder(args)
         model.create_ffn(args)

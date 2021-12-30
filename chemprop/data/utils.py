@@ -5,7 +5,7 @@ import pickle
 import random
 from typing import List, Set, Tuple
 import os
-
+import torch
 from rdkit import Chem
 import numpy as np
 from tqdm import tqdm
@@ -101,7 +101,7 @@ def filter_invalid_smiles(data: MoleculeDataset) -> MoleculeDataset:
     :return: A MoleculeDataset with only valid molecules.
     """
     for datapoint in data:
-        if datapoint.smiles != '' and datapoint.mol is  None:
+        if datapoint.smiles != '' and datapoint.mol is None:
             print(datapoint.smiles)
 
     return MoleculeDataset([datapoint for datapoint in data
@@ -161,6 +161,9 @@ def get_data(path: str,
         another_model_atom_descriptors_path = another_model_atom_descriptors_path if \
             another_model_atom_descriptors_path is not None \
             else args.another_model_atom_descriptors_path
+        ######transformer######
+        protein_features_path = args.atom_descriptors_path.rsplit('.', 1)[0]+'_protein.pkl' \
+            if atom_descriptors_path is not None else None
         ############################################
     else:
         use_compound_names = False
@@ -212,6 +215,10 @@ def get_data(path: str,
         try:
             descriptors, species = load_valid_atom_or_bond_features(atom_descriptors_path, [x[0] for x in all_smiles],
                                                            split_model=args.split_model)
+            ######transformer######
+            protein_descriptors, _ = load_valid_atom_or_bond_features(protein_features_path, [x[0] for x in all_smiles],
+                                                           split_model=args.split_model)
+            #######################
         except Exception as e:
             raise ValueError(f'Failed to load or validate custom atomic descriptors or features: {e}')
 
@@ -260,6 +267,7 @@ def get_data(path: str,
             overwrite_default_bond_features=args.overwrite_default_bond_features if args is not None else False,
             another_model_atom_descriptors=another_model_atom_descriptors[0][i] if another_model_atom_descriptors else None,
             another_species=another_species[0][i] if another_species and another_species[0] is not None else None,
+            protein_descriptors=protein_descriptors[i] if protein_descriptors is not None else None,
         ) for i, (smiles,targets) in tqdm(enumerate(zip(all_smiles,all_targets)), total=len(all_smiles))
     ])
 

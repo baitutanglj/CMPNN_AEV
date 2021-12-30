@@ -10,6 +10,28 @@ from chemprop.nn_utils import index_select_ND, get_activation_function
 import math
 import torch.nn.functional as F
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        '''
+        x: [seq_len, batch_size, d_model]
+        '''
+        x = x.transpose(0, 1)
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x).transpose(0, 1)
+
+
 class MPNEncoder(nn.Module):
     def __init__(self, args: Namespace, atom_fdim: int, bond_fdim: int):
         super(MPNEncoder, self).__init__()
@@ -62,15 +84,23 @@ class MPNEncoder(nn.Module):
         self.W_o = nn.Linear(
             (self.hidden_size) * 2,
             self.hidden_size)
-
+        ##############transformer#################
+        # self.positional_encoding = PositionalEncoding(d_model=self.hidden_size)
+        # self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=self.hidden_size,
+        #                                                             dim_feedforward=1024,
+        #                                                             nhead=8,
+        #                                                             batch_first=True,
+        #                                                             device=self.args.gpu,
+        #                                                             )
+        ##########################################
 
     def forward(self,mol_graph: BatchMolGraph, split_model:bool=False) -> torch.FloatTensor:
 
         f_atoms, f_bonds, a2b, b2a, b2revb, a_scope, b_scope, bonds = mol_graph.get_components()
         if self.args.cuda or next(self.parameters()).is_cuda:
             f_atoms, f_bonds, a2b, b2a, b2revb = (
-                    f_atoms.cuda(), f_bonds.cuda(), 
-                    a2b.cuda(), b2a.cuda(), b2revb.cuda())
+                    f_atoms.cuda(self.args.gpu)  , f_bonds.cuda(self.args.gpu)  ,
+                    a2b.cuda(self.args.gpu)  , b2a.cuda(self.args.gpu)  , b2revb.cuda(self.args.gpu)  )
             
         # Input
         input_atom = self.W_i_atom(f_atoms)  # num_atoms x hidden_size
@@ -107,7 +137,13 @@ class MPNEncoder(nn.Module):
             if a_size == 0:
                 assert 0
             cur_hiddens = atom_hiddens.narrow(0, a_start, a_size)
+            # norm = torch.norm(cur_hiddens, dim=1)
+            # norm = F.softmax(norm)
+            # norm = norm.unsqueeze(1)
+            # cur_hiddens = torch.sum(cur_hiddens*norm,dim=0)
             if split_model:
+                mol_vecs.append(cur_hiddens)
+            elif self.args.use_transformer:
                 mol_vecs.append(cur_hiddens)
             else:
                 mol_vecs.append(cur_hiddens.mean(0))
@@ -116,6 +152,8 @@ class MPNEncoder(nn.Module):
             mol_vecs = nn.utils.rnn.pad_sequence(
                 mol_vecs,batch_first=True,padding_value=-1
             )
+        elif self.args.use_transformer:
+            return mol_vecs  # B x H
         else:
             mol_vecs = torch.stack(mol_vecs, dim=0)
         

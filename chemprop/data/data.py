@@ -5,7 +5,7 @@ from typing import Callable, Dict, Iterator, List, Optional, Union
 import numpy as np
 from torch.utils.data.dataset import Dataset
 from rdkit import Chem
-
+import torch
 from .scaler import StandardScaler
 from chemprop.features import get_features_generator
 
@@ -25,7 +25,8 @@ class MoleculeDatapoint:
                  overwrite_default_atom_features: bool = False,
                  overwrite_default_bond_features: bool = False,
                  another_model_atom_descriptors: np.ndarray = None,
-                 another_species:np.ndarray = None,):
+                 another_species:np.ndarray = None,
+                 protein_descriptors: np.ndarray = None):
         """
         Initializes a MoleculeDatapoint, which contains a single molecule.
 
@@ -71,6 +72,7 @@ class MoleculeDatapoint:
         self.overwrite_default_bond_features = overwrite_default_bond_features
         self.another_model_atom_descriptors = another_model_atom_descriptors
         self.another_species = another_species
+        self.protein_descriptors = protein_descriptors
         ####################################################
 
         # Generate additional features if given a generator
@@ -107,12 +109,17 @@ class MoleculeDatapoint:
             self.another_model_atom_descriptors = np.where(np.isnan(self.another_model_atom_descriptors),
                                                            replace_token, self.another_model_atom_descriptors)
 
+        if self.protein_descriptors is not None:
+            self.protein_descriptors = np.where(np.isnan(self.protein_descriptors), replace_token, self.protein_descriptors)
+            self.protein_descriptors = torch.from_numpy(self.protein_descriptors).to(torch.float32)
+
 
         # Save a copy of the raw features and targets to enable different scaling later on
         self.raw_features, self.raw_targets = self.features, self.targets
         self.raw_atom_descriptors, self.raw_atom_features, self.raw_bond_features = \
             self.atom_descriptors, self.atom_features, self.bond_features
         self.raw_another_model_atom_descriptors = self.another_model_atom_descriptors
+        self.raw_protein_descriptors = self.protein_descriptors
 
     def set_features(self, features: np.ndarray):
         """
@@ -146,6 +153,14 @@ class MoleculeDatapoint:
         :param atom_descriptors: A 1D numpy array of features for the molecule.
         """
         self.atom_descriptors = atom_descriptors
+
+    def set_protein_descriptors(self, protein_descriptors: np.ndarray) -> None:
+        """
+        Sets the atom descriptors of the molecule.
+
+        :param protein_descriptors: A 1D numpy array of features for the molecule.
+        """
+        self.protein_descriptors = protein_descriptors
 
     def set_atom_features(self, atom_features: np.ndarray) -> None:
         """
@@ -192,6 +207,7 @@ class MoleculeDatapoint:
         self.features, self.targets = self.raw_features, self.raw_targets
         self.atom_descriptors, self.atom_features, self.bond_features = \
             self.raw_atom_descriptors, self.raw_atom_features, self.raw_bond_features
+        self.protein_descriptors = self.raw_protein_descriptors
 
     def set_species(self,species:List[Union[str,float]]):
         """
@@ -255,6 +271,14 @@ class MoleculeDataset(Dataset):
 
         return [d.features for d in self.data]
 
+    def features_size(self) -> int:
+        """
+        Returns the size of the additional features vector associated with the molecules.
+
+        :return: The size of the additional features vector.
+        """
+        return len(self.data[0].features) if len(self.data) > 0 and self.data[0].features is not None else None
+
     def targets(self) -> List[List[float]]:
         """
         Returns the targets associated with each molecule.
@@ -312,6 +336,18 @@ class MoleculeDataset(Dataset):
 
         return [d.atom_descriptors for d in self.data]
 
+    def protein_descriptors(self) -> List[np.ndarray]:
+        """
+        Returns the atom descriptors associated with each molecule (if they exit).
+
+        :return: A list of 2D numpy arrays containing the atom descriptors
+                 for each molecule or None if there are no features.
+        """
+        if len(self.data) == 0 or self.data[0].protein_descriptors is None:
+            return None
+
+        return [d.protein_descriptors for d in self.data]
+
     def bond_features(self) -> List[np.ndarray]:
         """
         Returns the bond features associated with each molecule (if they exit).
@@ -332,6 +368,15 @@ class MoleculeDataset(Dataset):
         """
         return len(self.data[0].atom_descriptors[0]) \
             if len(self.data) > 0 and self.data[0].atom_descriptors is not None else None
+
+    def protein_descriptors_size(self) -> int:
+        """
+        Returns the size of custom additional atom descriptors vector associated with the molecules.
+
+        :return: The size of the additional atom descriptor vector.
+        """
+        return len(self.data[0].protein_descriptors[0]) \
+            if len(self.data) > 0 and self.data[0].protein_descriptors is not None else None
 
     def atom_features_size(self) -> int:
         """

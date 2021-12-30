@@ -105,7 +105,8 @@ def trainparser(default="BP"):
 
     parser.add_argument("--no_contain_header", action="store_true", default=False,
                         help='testfile not contain header names')
-
+    parser.add_argument("--add_atom_descriptors", action="store_true", default=False, help="Add atom descriptors")
+    parser.add_argument("--add_atom_type", action="store_true", default=False, help="Add atom type")
     args = parser.parse_args()
 
     return args
@@ -151,7 +152,8 @@ def predictparser():
 
     parser.add_argument("--no_contain_header", action="store_true", default=False,
                         help='testfile not contain header names')
-
+    parser.add_argument("--add_atom_descriptors", action="store_true", default=False, help="Add atom descriptors")
+    parser.add_argument("--add_atom_type", action="store_true", default=False, help="Add atom type")
     args = parser.parse_args()
 
     return args

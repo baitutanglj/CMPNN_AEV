@@ -241,6 +241,8 @@ def add_train_args(parser: ArgumentParser):
                         help='Path to file with atom features for train another MPN model')
     parser.add_argument('--another_model_test_atom_descriptors_path', type=str, nargs='+', default=None,
                         help='Path to file with atom features for test another MPN model')
+    parser.add_argument('--use_transformer', action='store_true', default=False,
+                        help='use transformer model after MPN model')
     #########################
 
 
@@ -354,8 +356,8 @@ def modify_train_args(args: Namespace):
 
     update_checkpoint_args(args)
     
-    if args.features_only:
-        assert args.features_generator or args.features_path
+    # if args.features_only:
+    #     assert args.features_generator or args.features_path
 
     args.use_input_features = args.features_generator or args.features_path
 

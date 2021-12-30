@@ -20,7 +20,7 @@ from chemprop.models import build_model
 from chemprop.nn_utils import param_count
 from chemprop.utils import build_optimizer, build_lr_scheduler, get_loss_func, get_metric_func, load_checkpoint,\
     makedirs, save_checkpoint
-from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim
+from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim, set_extra_protein_fdim
 
 
 def run_training(args: Namespace, logger: Logger = None) -> List[float]:
@@ -66,7 +66,9 @@ def run_training(args: Namespace, logger: Logger = None) -> List[float]:
     if args.another_model_atom_descriptors_path is not None:
         args.another_model_atom_descriptors_size = data.another_model_atom_descriptors_size()
         # set_extra_atom_fdim(args.another_model_atom_descriptors_size)
-
+    if data[0].protein_descriptors is not None:
+        args.protein_descriptors_size = data[0].protein_descriptors.shape[-1]
+        set_extra_protein_fdim(args.protein_descriptors_size)
     debug(f'Number of tasks = {args.num_tasks}')
     ###############################################
     
@@ -218,7 +220,7 @@ def run_training(args: Namespace, logger: Logger = None) -> List[float]:
         # Load/build model
         if args.checkpoint_paths is not None:
             debug(f'Loading model {model_idx} from {args.checkpoint_paths[model_idx]}')
-            model = load_checkpoint(args.checkpoint_paths[model_idx], current_args=args, logger=logger)
+            model = load_checkpoint(args.checkpoint_paths[model_idx], current_args=args, logger=logger, gpu=args.gpu)
         else:
             debug(f'Building model {model_idx}')
             model = build_model(args)
@@ -227,7 +229,7 @@ def run_training(args: Namespace, logger: Logger = None) -> List[float]:
         debug(f'Number of parameters = {param_count(model):,}')
         if args.cuda:
             debug('Moving model to cuda')
-            model = model.cuda()
+            model = model.cuda(args.gpu)
 
         # Ensure that model is saved in correct location for evaluation if 0 epochs
         save_checkpoint(path = os.path.join(save_dir, 'model.pt'),
@@ -294,7 +296,7 @@ def run_training(args: Namespace, logger: Logger = None) -> List[float]:
 
                 # Evaluate on test set using model with best validation score
         info(f'Model {model_idx} best validation {args.metric} = {best_score:.6f} on epoch {best_epoch}')
-        model = load_checkpoint(os.path.join(save_dir, 'model.pt'), cuda=args.cuda, logger=logger)
+        model = load_checkpoint(os.path.join(save_dir, 'model.pt'), cuda=args.cuda, logger=logger,gpu=args.gpu)
         
         test_preds = predict(
             model=model,

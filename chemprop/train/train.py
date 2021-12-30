@@ -58,6 +58,7 @@ def train(model: nn.Module,
         atom_descriptors_batch, atom_features_batch, bond_features_batch = \
             mol_batch.atom_descriptors(), mol_batch.atom_features(), mol_batch.bond_features()
         species_batch = mol_batch.species()
+        protein_descriptors_bacth = mol_batch.protein_descriptors()
         if species_batch[0] is not None:
             species_batch = nn.utils.rnn.pad_sequence(
             mol_batch.species(), batch_first=True, padding_value=-1
@@ -69,12 +70,12 @@ def train(model: nn.Module,
         targets = torch.Tensor([[0 if x is None else x for x in tb] for tb in target_batch])
 
         if next(model.parameters()).is_cuda:
-            mask, targets = mask.cuda(), targets.cuda()
+            mask, targets = mask.cuda(args.gpu), targets.cuda(args.gpu)
 
         class_weights = torch.ones(targets.shape)
 
         if args.cuda:
-            class_weights = class_weights.cuda()
+            class_weights = class_weights.cuda(args.gpu)
 
         # Run model
         model.zero_grad()
@@ -82,7 +83,8 @@ def train(model: nn.Module,
         ##############my addition##################
         preds = model(batch, features_batch, atom_descriptors_batch,
                       atom_features_batch, bond_features_batch,
-                      species_batch,another_model_atom_descriptors_batch)
+                      species_batch,another_model_atom_descriptors_batch,
+                      protein_descriptors_bacth)
         ###########################################
         if args.dataset_type == 'multiclass':
             targets = targets.long()

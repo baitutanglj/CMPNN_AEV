@@ -89,38 +89,38 @@ def morgan_counts_features_generator(mol: Molecule,
     return features
 
 
-try:
-    from descriptastorus.descriptors import rdDescriptors, rdNormalizedDescriptors
-
-    @register_features_generator('rdkit_2d')
-    def rdkit_2d_features_generator(mol: Molecule) -> np.ndarray:
-        """
-        Generates RDKit 2D features for a molecule.
-
-        :param mol: A molecule (i.e. either a SMILES string or an RDKit molecule).
-        :return: A 1D numpy array containing the RDKit 2D features.
-        """
-        smiles = Chem.MolToSmiles(mol, isomericSmiles=True) if type(mol) != str else mol
-        generator = rdDescriptors.RDKit2D()
-        features = generator.process(smiles)[1:]
-
-        return features
-
-    @register_features_generator('rdkit_2d_normalized')
-    def rdkit_2d_features_generator(mol: Molecule) -> np.ndarray:
-        """
-        Generates RDKit 2D normalized features for a molecule.
-
-        :param mol: A molecule (i.e. either a SMILES string or an RDKit molecule).
-        :return: A 1D numpy array containing the RDKit 2D normalized features.
-        """
-        smiles = Chem.MolToSmiles(mol, isomericSmiles=True) if type(mol) != str else mol
-        generator = rdNormalizedDescriptors.RDKit2DNormalized()
-        features = generator.process(smiles)[1:]
-
-        return features
-except ImportError:
-    pass
+# try:
+#     from descriptastorus.descriptors import rdDescriptors, rdNormalizedDescriptors
+#
+#     @register_features_generator('rdkit_2d')
+#     def rdkit_2d_features_generator(mol: Molecule) -> np.ndarray:
+#         """
+#         Generates RDKit 2D features for a molecule.
+#
+#         :param mol: A molecule (i.e. either a SMILES string or an RDKit molecule).
+#         :return: A 1D numpy array containing the RDKit 2D features.
+#         """
+#         smiles = Chem.MolToSmiles(mol, isomericSmiles=True) if type(mol) != str else mol
+#         generator = rdDescriptors.RDKit2D()
+#         features = generator.process(smiles)[1:]
+#
+#         return features
+#
+#     @register_features_generator('rdkit_2d_normalized')
+#     def rdkit_2d_features_generator(mol: Molecule) -> np.ndarray:
+#         """
+#         Generates RDKit 2D normalized features for a molecule.
+#
+#         :param mol: A molecule (i.e. either a SMILES string or an RDKit molecule).
+#         :return: A 1D numpy array containing the RDKit 2D normalized features.
+#         """
+#         smiles = Chem.MolToSmiles(mol, isomericSmiles=True) if type(mol) != str else mol
+#         generator = rdNormalizedDescriptors.RDKit2DNormalized()
+#         features = generator.process(smiles)[1:]
+#
+#         return features
+# except ImportError:
+#     pass
 
 
 """

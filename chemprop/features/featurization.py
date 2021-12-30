@@ -36,6 +36,7 @@ BOND_FDIM = 14
 #################my addition############
 EXTRA_ATOM_FDIM = 0
 EXTRA_BOND_FDIM = 0
+EXTRA_protein_FDIM = 0
 ########################################
 # Memoization
 SMILES_TO_GRAPH = {}
@@ -76,6 +77,11 @@ def set_extra_bond_fdim(extra):
     """Change the dimensionality of the bond feature vector."""
     global EXTRA_BOND_FDIM
     EXTRA_BOND_FDIM = extra
+
+def set_extra_protein_fdim(extra):
+    """Change the dimensionality of the bond feature vector."""
+    global EXTRA_protein_FDIM
+    EXTRA_protein_FDIM = extra
 ###############################################
 
 def get_bond_fdim(args: Namespace) -> int:
@@ -445,3 +451,21 @@ def mol2graph(smiles_batch: List[str],
         return BatchMolGraph(mol_graphs, args, None)
     else:
         return BatchMolGraph(mol_graphs, args, args.another_model_atom_descriptors_size)
+
+
+def pack(atoms,device):
+    atoms_len = 0
+    proteins_len = 0
+    N = len(atoms)
+    atom_num = []
+    for atom in atoms:
+        atom_num.append(atom.shape[0])
+        if atom.shape[0] >= atoms_len:
+            atoms_len = atom.shape[0]
+    atoms_new = torch.zeros((N,atoms_len,34), device=device)
+    i = 0
+    for atom in atoms:
+        a_len = atom.shape[0]
+        atoms_new[i, :a_len, :] = atom
+        i += 1
+    return atoms_new

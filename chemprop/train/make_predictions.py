@@ -10,7 +10,7 @@ from .predict import predict
 from chemprop.data import MoleculeDataset
 from chemprop.data.utils import get_data, get_data_from_smiles
 from chemprop.utils import load_args, load_checkpoint, load_scalers
-from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim
+from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim,set_extra_protein_fdim
 from .evaluate import evaluate, evaluate_predictions
 from chemprop.utils import get_metric_func
 
@@ -34,6 +34,9 @@ def make_predictions(args: Namespace, smiles: List[str] = None) -> List[Optional
     for key, value in vars(train_args).items():
         if not hasattr(args, key):
             setattr(args, key, value)
+
+    ###Change datapaths in train_args###
+    setattr(train_args, 'datapaths', args.datapaths)
 
     print('Loading data')
     if smiles is not None:
@@ -72,6 +75,9 @@ def make_predictions(args: Namespace, smiles: List[str] = None) -> List[Optional
     if args.bond_features_path is not None:
         args.bond_features_size = test_data.bond_features_size()
         set_extra_bond_fdim(args.bond_features_size)
+    if test_data[0].protein_descriptors is not None:
+        args.protein_descriptors_size = test_data[0].protein_descriptors.shape[-1]
+        set_extra_protein_fdim(args.protein_descriptors_size)
     ##################################################
 
     # Predict with each model individually and sum predictions
@@ -82,7 +88,7 @@ def make_predictions(args: Namespace, smiles: List[str] = None) -> List[Optional
     print(f'Predicting with an ensemble of {len(args.checkpoint_paths)} models')
     for checkpoint_path in tqdm(args.checkpoint_paths, total=len(args.checkpoint_paths)):
         # Load model
-        model = load_checkpoint(checkpoint_path, cuda=args.cuda)
+        model = load_checkpoint(path=checkpoint_path,current_args=train_args, cuda=args.cuda, gpu=args.gpu)
         model_preds = predict(
             model=model,
             data=test_data,

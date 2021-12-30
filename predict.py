@@ -4,14 +4,15 @@ Created on Wed Dec  4 19:42:36 2019
 
 @author: SY
 """
-import warnings
-warnings.filterwarnings('ignore')
+# import warnings
+# warnings.filterwarnings('ignore')
 import pandas as pd
 # from chemprop.parsing import parse_train_args, modify_train_args
 from chemprop.parsing import parse_predict_args, modify_predict_args
 from chemprop.train import make_predictions
 from chemprop.data.utils import get_task_names
-
+import faulthandler
+faulthandler.enable()
 if __name__ == '__main__':
     args = parse_predict_args()
     modify_predict_args(args)
