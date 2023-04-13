@@ -1,13 +1,13 @@
 # CMPNN_AEV
 The code was built based on [DMPNN](https://github.com/chemprop/chemprop). Thanks a lot for their code sharing!
 
-##Dependencies
+## Dependencies
 + cuda >= 8.0
 + cuDNN
 + RDKit
 + torch >= 1.2.0
 
-##Usage
+## Usage
 ### 1.Download Data
 First, you need to go to http://www.pdbbind.org.cn/download.php to download the PDBBIND Refined set v2016 and CASF v2016 in order to train/test the model.
 ### 2.Generate atomic environment vector
