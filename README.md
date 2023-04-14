@@ -1,5 +1,6 @@
 # CMPNN_AEV
 The code was built based on [DMPNN](https://github.com/chemprop/chemprop). Thanks a lot for their code sharing!
+[Torchaani](https://github.com/aiqm/torchani) calculate the atomic environment vector
 
 ## Dependencies
 + cuda >= 8.0
